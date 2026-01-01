@@ -1,4 +1,4 @@
-![alt text](<images/Pharmacy ml engineer end-to-end.jpg>)
+![alt text](<images/ml engineer pharmacy workflow.png>)
 
 # 🧪💊 Pharmacy Machine Learning Engineer – End-to-End Workflow
 
