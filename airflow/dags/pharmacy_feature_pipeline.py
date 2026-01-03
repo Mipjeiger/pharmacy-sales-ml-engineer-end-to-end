@@ -1,33 +1,34 @@
 from airflow import DAG
-from airflow.providers.postgres.operators.postgres import PostgresOperator
-from airflow.utils.dates import days_ago
-from plugins.slack_utils import slack_alert
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from datetime import datetime, timedelta
+
+# from plugins.slack_utils import slack_alert  # Comment out if slack_utils not available
 
 default_args = {
     "owner": "ml-engineer",
-    "on_failure_callback": slack_alert,
+    # "on_failure_callback": slack_alert,  # Comment out if slack_utils not available
 }
 
 with DAG(
     dag_id="pharmacy_feature_pipeline",
-    start_date=days_ago(1),
+    start_date=datetime(2025, 1, 1),
     default_args=default_args,
     catchup=False,
-    schedule_interval="@daily",
+    schedule=None,
     tags=["pharmacy", "features"],
 ) as dag:
 
-    check_raw_data = PostgresOperator(
+    check_raw_data = SQLExecuteQueryOperator(
         task_id="check_raw_pharmacy_sales",
-        postgres_conn_id="pharmacy_db",
+        conn_id="pharmacy_db",
         sql="""
         SELECT COUNT(*) FROM raw.pharmacy_sales WHERE sales IS NULL OR quantity < 0;
         """,
     )
 
-    refresh_sales_feature = PostgresOperator(
+    refresh_sales_feature = SQLExecuteQueryOperator(
         task_id="refresh_pharmacy_sales_features",
-        postgres_conn_id="pharmacy_db",
+        conn_id="pharmacy_db",
         sql="""
         DELETE FROM features.sales_feature WHEN year = EXTRACT(YEAR FROM CURRENT_DATE)
             AND month = EXTRACT(MONTH FROM CURRENT_DATE);
@@ -51,9 +52,9 @@ with DAG(
         """,
     )
 
-    refresh_llm_context = PostgresOperator(
+    refresh_llm_context = SQLExecuteQueryOperator(
         task_id="refresh_sales_llm_context",
-        postgres_conn_id="pharmacy_db",
+        conn_id="pharmacy_db",
         sql="""
         INSERT INTO features.sales_llm_context
         SELECT * FROM features.sales_feature
