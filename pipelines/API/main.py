@@ -13,9 +13,11 @@ from dotenv import load_dotenv
 # ============================================
 # load and read .env file from the root directory
 # ============================================
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ENV_PATH = os.path.abspath(os.path.join(BASE_DIR, "..", ".env"))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 
+# Load .env file from project root
+ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 load_dotenv(dotenv_path=ENV_PATH)
 
 DB_USER = os.getenv("DB_USER")
@@ -40,17 +42,16 @@ engine = create_engine(
 # ============================================
 # Load machine learning models
 # ============================================
-PROJECT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", ".."))
 
 MODEL_PATHS = {
     "CatBoostRegressor": os.path.join(
-        PROJECT_DIR, "notebook", "models", "catboost_model.joblib"
+        PROJECT_ROOT, "notebook", "models", "catboost_model.joblib"
     ),
     "LinearRegression": os.path.join(
-        PROJECT_DIR, "notebook", "models", "linear_regression_model.joblib"
+        PROJECT_ROOT, "notebook", "models", "linear_regression_model.joblib"
     ),
     "RandomForestRegressor": os.path.join(
-        PROJECT_DIR, "notebook", "models", "random_forest_model.joblib"
+        PROJECT_ROOT, "notebook", "models", "random_forest_model.joblib"
     ),
 }
 
@@ -80,13 +81,17 @@ app = FastAPI(title="Pharmacy Sales Prediction API", version="1.0.0")
 
 # ============================================
 # Pydantic Schemas (Sales - Existing)
-class SalesQueryRequest(BaseModel):
+class SalesQueryRequest(
+    BaseModel
+):  # using class pydantic is clearly to entry data validation easier
     year: int
     month: str
     product_name: str | None = None
 
 
-class SalesInsertRequest(BaseModel):
+class SalesInsertRequest(
+    BaseModel
+):  # using class pydantic is clearly to entry data validation easier
     distributor: str
     product_name: str
     year: int
@@ -96,7 +101,9 @@ class SalesInsertRequest(BaseModel):
 
 
 # Pydantic Schemas (Sales - Prediction)
-class SalesPredictRequest(BaseModel):
+class SalesPredictRequest(
+    BaseModel
+):  # using class pydantic is clearly to entry data validation easier
     model_name: str  # catboost | LinearRegression | RandomForestRegressor
 
     total_sales: float
@@ -118,6 +125,16 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+# Load model check endpoint
+@app.get("/models")
+def get_loaded_models():
+    try:
+        return {"loaded_models": list(models.keys())}
+    except Exception as e:
+        logger.error(f"Error loading models: {e}")
+        raise HTTPException(status_code=500, detail="Models could not be loaded")
 
 
 # Query sales data endpoint
@@ -188,12 +205,12 @@ def predict_sales(payload: SalesPredictRequest):
         feature_vector = build_feature_vector(payload=payload)
         model = models[payload.model_name]
         prediction = model.predict(feature_vector)
-        return {"model": payload.model_name, "prediction": prediction.tolist()}
+        return {"model": payload.model_name, "prediction": float(prediction[0])}
 
     except Exception as e:
         logger.error(f"Error predicting sales: {e}")
         raise HTTPException(
-            status_code=500, detail="Error predicting sales trouble with loading models"
+            status_code=500, detail="Error predicting sales with the selected model"
         )
 
 
